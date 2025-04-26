@@ -3,7 +3,8 @@ const colors = require("colors");
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI, {
+    const dbURI = "mongodb://localhost:27017";
+    const conn = await mongoose.connect(dbURI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
