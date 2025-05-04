@@ -10,7 +10,22 @@ const allMessages = asyncHandler(async (req, res) => {
   try {
     const messages = await Message.find({ chat: req.params.chatId })
       .populate("sender", "name pic email")
-      .populate("chat");
+      .populate({
+        path: "chat",
+        populate: [
+          {
+            path: "users.participantId",
+            model: "User", // Populate User model
+            select: "name pic email",
+          },
+          {
+            path: "users.participantId",
+            model: "Lawyer", // Populate Lawyer model
+            select: "name pic email",
+          },
+        ],
+      });
+
     res.json(messages);
   } catch (error) {
     res.status(400);
@@ -29,23 +44,24 @@ const sendMessage = asyncHandler(async (req, res) => {
     return res.sendStatus(400);
   }
 
-  var newMessage = {
+  const newMessage = {
     sender: req.user._id,
+    senderModel: req.user.role === "Lawyer" ? "Lawyer" : "User",
     content: content,
     chat: chatId,
   };
 
   try {
-    var message = await Message.create(newMessage);
+    let message = await Message.create(newMessage);
 
-    message = await message.populate("sender", "name pic").execPopulate();
-    message = await message.populate("chat").execPopulate();
-    message = await User.populate(message, {
-      path: "chat.users",
+    message = await message.populate("sender", "name pic");
+    message = await message.populate("chat");
+    message = await message.populate({
+      path: "chat.users.participantId",
       select: "name pic email",
     });
 
-    await Chat.findByIdAndUpdate(req.body.chatId, { latestMessage: message });
+    await Chat.findByIdAndUpdate(chatId, { latestMessage: message });
 
     res.json(message);
   } catch (error) {
@@ -53,5 +69,6 @@ const sendMessage = asyncHandler(async (req, res) => {
     throw new Error(error.message);
   }
 });
+
 
 module.exports = { allMessages, sendMessage };

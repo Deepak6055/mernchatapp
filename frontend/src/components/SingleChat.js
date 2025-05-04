@@ -73,6 +73,7 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
   const sendMessage = async (event) => {
     if (event.key === "Enter" && newMessage) {
       socket.emit("stop typing", selectedChat._id);
+  
       try {
         const config = {
           headers: {
@@ -80,21 +81,53 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
             Authorization: `Bearer ${user.token}`,
           },
         };
+  
+        // Fetch the chat to get participants
+        const { data: chatData } = await axios.get(
+          `/api/chat/${selectedChat._id}`,
+          config
+        );
+        console.log("Chat Data:", chatData);
+  
+        // Ensure participants are valid
+        const participants = chatData.users.map((participant) => ({
+          participantId: participant.participantId._id,
+          participantModel: participant.participantModel,
+        }));
+  
+        if (participants.length < 2) {
+          toast({
+            title: "Error",
+            description: "Chat must have at least two participants.",
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+            position: "bottom",
+          });
+          return;
+        }
+  
+        // Create the new message
         setNewMessage("");
-        const { data } = await axios.post(
+        const { data: messageData } = await axios.post(
           "/api/message",
           {
             content: newMessage,
-            chatId: selectedChat,
+            chatId: selectedChat._id,
           },
           config
         );
-        socket.emit("new message", data);
-        setMessages([...messages, data]);
+        console.log("Message Data:", messageData);
+        // Emit the new message to the socket
+        socket.emit("new message", messageData);
+  
+        // Update the messages state
+        setMessages([...messages, messageData]);
       } catch (error) {
+        console.error("Error sending message:", error);
         toast({
-          title: "Error Occured!",
-          description: "Failed to send the Message",
+          title: "Error Occurred!",
+          description: "Failed to send the message.",
           status: "error",
           duration: 5000,
           isClosable: true,
@@ -103,7 +136,6 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
       }
     }
   };
-
   useEffect(() => {
     socket = io(ENDPOINT);
     socket.emit("setup", user);
